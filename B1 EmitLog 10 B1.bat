@@ -1,0 +1,1 @@
+PublishSubscribe\EmitLog\bin\Debug\net8.0\EmitLog 10 B1

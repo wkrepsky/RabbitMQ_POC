@@ -1,0 +1,1 @@
+PublishSubscribeDirect\ReceiveLogsDirect\bin\Debug\net8.0\ReceiveLogsDirect info

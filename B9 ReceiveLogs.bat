@@ -1,0 +1,1 @@
+PublishSubscribe\ReceiveLogs\bin\Debug\net8.0\ReceiveLogs

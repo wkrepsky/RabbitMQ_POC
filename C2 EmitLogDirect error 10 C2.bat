@@ -1,0 +1,1 @@
+PublishSubscribeDirect\EmitLogDirect\bin\Debug\net8.0\EmitLogDirect error 10 C2

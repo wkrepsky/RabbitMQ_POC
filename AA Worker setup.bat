@@ -1,0 +1,1 @@
+WorkQueue\Worker\bin\Debug\net8.0\Worker setup
