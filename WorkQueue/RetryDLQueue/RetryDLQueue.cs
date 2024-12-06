@@ -19,15 +19,14 @@ internal class Program
         await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
         // Consumir mensagens até que a fila esteja vazia
-        int transferedItems = 0;
+        int transferedMessages = 0;
         while (true)
         {
             var result = await channel.BasicGetAsync(DlQueue, autoAck: false);
+
+            // Se não houver mais mensagens, saia do loop
             if (result == null)
-            {
-                // Se não houver mais mensagens, saia do loop
                 break;
-            }
 
             var body = result.Body.ToArray();
             var message = Encoding.UTF8.GetString(body);
@@ -45,6 +44,7 @@ internal class Program
                 await channel.BasicPublishAsync(exchange: string.Empty, routingKey: MainQueue, mandatory: true, basicProperties: properties, body: body);
                 Console.WriteLine($" - Movida para MainQueue");
                 await channel.BasicAckAsync(deliveryTag: result.DeliveryTag, multiple: false);
+                transferedMessages++;
             }
             catch (Exception ex)
             {
@@ -54,6 +54,9 @@ internal class Program
             }
         }
 
-        Console.WriteLine($" Itens da Dead Letter Queue movidos para a MainQueue: {transferedItems}");
+        if (transferedMessages > 0)
+            Console.WriteLine($" [X] {transferedMessages} Mensagens transferidas da DLQ para fila principal");
+        else   
+            Console.WriteLine(" [#] DLQ vazia!");
     }
 }
