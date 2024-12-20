@@ -10,6 +10,8 @@ internal class Program
     private const string RetryQueue = "x_retry_queue";
     private const string DlQueue = "x_dl_queue";
 
+    public static string Actor = "Worker" + new Random().Next(1, 100);
+
     private const int MaxRetries = 5;
 
     private static readonly int[] _attemptDelay = new int[] { 5, 10, 20, 40, 80, 160 };
@@ -23,7 +25,7 @@ internal class Program
         if ((args.Length > 0) && (args[0].ToLower() == "setup"))
         {
             await SetupQueues(channel);
-            Console.WriteLine("OK Queues setup done.");
+            Console.WriteLine(" [*] Queues setup done");
             return;
         }
 
@@ -32,7 +34,7 @@ internal class Program
 
         await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-        Console.WriteLine(" [*] Waiting for messages.");
+        Console.WriteLine($" [*] {Actor}: Waiting for messages.");
 
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (model, ea) =>
@@ -45,9 +47,10 @@ internal class Program
             if (ea.BasicProperties.Headers != null && ea.BasicProperties.Headers.TryGetValue("x-retry-count", out var retryCountObj))
                 retryCount = Convert.ToInt32(retryCountObj);
             else
-                retryCount = 1;
+                retryCount = 0;
 
-            Console.Write($" [x] Got {message}");
+            string retryText = (retryCount == 0) ? "" : $"Retry {retryCount}";
+            Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tGot\t{message}\t{retryText}");
 
             // Duração da execução
             int dots = message.Split('.').Length - 1;
@@ -57,19 +60,21 @@ internal class Program
                 // Simulando a execução de alguma tarefa
                 await RunProcess(dots);
 
-                Console.WriteLine(" - OK");
+                Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tDone\t{message}");
 
                 // Commit
                 await channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
             }
             catch (System.Exception e)
             {
-                Console.Write($" - FAIL: {e.Message}");
+                Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tFail\t{message}\t{e.Message}");
 
                 // Retry
-                if (retryCount <= MaxRetries)
+                if (retryCount < MaxRetries)
                 {
-                    Console.WriteLine($" - Sent to RETRY:{retryCount}");
+                    retryCount++;
+
+                    Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tRetry {retryCount}\t{message}");
 
                     // Reenviar para a fila de retry
                     var properties = new BasicProperties
@@ -77,7 +82,7 @@ internal class Program
                         Persistent = true
                     };
                     properties.Headers = ea.BasicProperties.Headers ?? new Dictionary<string, object?>();
-                    properties.Headers["x-retry-count"] = retryCount + 1;
+                    properties.Headers["x-retry-count"] = retryCount;
 
                     await channel.BasicPublishAsync(exchange: string.Empty, routingKey: RetryQueue + $"_{retryCount}", mandatory: true, basicProperties: properties, body: body);
 
@@ -85,7 +90,7 @@ internal class Program
                 }
                 else  // DLQ
                 {
-                    Console.WriteLine($" - Sent to DLQ");
+                    Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tDLQ\t{message}");
 
                     await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, false);
                 }
@@ -96,8 +101,9 @@ internal class Program
         // A fila que será consumida é a MainQueue
         await channel.BasicConsumeAsync(MainQueue, autoAck: false, consumer: consumer);
 
-        Console.WriteLine(" Press [enter] to exit.");
+        Console.WriteLine(" [*] Press [enter] to exit.");
         Console.ReadLine();   
+        Console.WriteLine(" [*] Exiting.");
     }
 
     private static async Task SetupQueues(IChannel channel)

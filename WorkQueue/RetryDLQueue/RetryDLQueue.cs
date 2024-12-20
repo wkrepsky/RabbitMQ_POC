@@ -10,6 +10,8 @@ internal class Program
     
     private const string DlQueue = "x_dl_queue";
 
+    public const string Actor = "RetryDLQ";
+
     private static async Task Main(string[] args)
     {
         var factory = new ConnectionFactory { HostName = "localhost" };
@@ -31,7 +33,7 @@ internal class Program
             var body = result.Body.ToArray();
             var message = Encoding.UTF8.GetString(body);
 
-            Console.Write($" [x] Got from DLQ: {message}");
+            Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tGot\t{message}");
 
             try
             {
@@ -42,13 +44,13 @@ internal class Program
                 };
 
                 await channel.BasicPublishAsync(exchange: string.Empty, routingKey: MainQueue, mandatory: true, basicProperties: properties, body: body);
-                Console.WriteLine($" - Movida para MainQueue");
+                Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tResent\t{message}");
                 await channel.BasicAckAsync(deliveryTag: result.DeliveryTag, multiple: false);
                 transferedMessages++;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" - Erro ao mover: {ex.Message}");
+                Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss:fff")}\t{Program.Actor}\tFail\t{message}\t{ex.Message}");
                 
                 await channel.BasicNackAsync(deliveryTag: result.DeliveryTag, multiple: false, requeue: true);
             }
